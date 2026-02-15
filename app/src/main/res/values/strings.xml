@@ -1,3 +1,4 @@
+<!-- app/src/main/res/values/strings.xml -->
 <resources>
-    <string name="app_name">Android Boilerplate</string>
+    <string name="app_name">My Web App</string>
 </resources>
