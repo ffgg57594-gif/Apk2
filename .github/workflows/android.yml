@@ -2,7 +2,6 @@
 
 name: Android CI/CD
 
-# تشغيل الأتمتة عند رفع الكود على فرع main أو master
 on:
   push:
     branches: [ "main", "master" ]
@@ -14,11 +13,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. جلب الكود من المستودع
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. إعداد نسخة الجافا (JDK 17 مناسبة لأغلب إصدارات Gradle الحديثة)
     - name: set up JDK 17
       uses: actions/setup-java@v4
       with:
@@ -26,15 +23,18 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    # 3. إعطاء صلاحية التنفيذ لملف gradlew
+    # خطوة إضافية لإصلاح ملف gradle-wrapper.jar التالف
+    - name: Repair Corrupt Gradle Wrapper
+      run: |
+        rm -f gradle/wrapper/gradle-wrapper.jar
+        wget https://raw.githubusercontent.com/gradle/gradle/v8.7/gradle/wrapper/gradle-wrapper.jar -P gradle/wrapper/
+
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    # 4. بناء نسخة الـ APK (Debug)
     - name: Build with Gradle
       run: ./gradlew assembleDebug
 
-    # 5. رفع ملف الـ APK الناتج كأثر (Artifact) لكي تتمكن من تحميله
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
