@@ -1,16 +1,19 @@
+// Apk44-main/build.gradle
+
 buildscript {
     ext {
-        buildToolsVersion = "29.0.3"
+        // تحديث النسخ لتتوافق مع ما وضعناه في مجلد app
+        buildToolsVersion = "35.0.0"
         minSdkVersion = 21
-        compileSdkVersion = 29
-        targetSdkVersion = 29
-        ndkVersion = "20.1.5948944"
+        compileSdkVersion = 35
+        targetSdkVersion = 35
     }
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
+        // نسخة الـ Gradle Plugin المستخدمة حالياً وهي حديثة وممتازة
         classpath('com.android.tools.build:gradle:8.5.2')
     }
 }
