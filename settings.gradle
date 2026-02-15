@@ -1,2 +1,6 @@
+// Apk44-main/settings.gradle
+
 rootProject.name = 'androidBoilerplate'
+
+// هذا السطر يخبر الأندرويد أن مجلد الكود الفعلي موجود داخل مجلد اسمه app
 include ':app'
