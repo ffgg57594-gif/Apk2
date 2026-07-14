@@ -12,22 +12,32 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    # هذه الخطوة ستقوم بإصلاح ملف الإعدادات التالف قبل البدء
+    - name: Fix Gradle Wrapper URL
+      run: |
+        echo "distributionBase=GRADLE_USER_HOME" > gradle/wrapper/gradle-wrapper.properties
+        echo "distributionPath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+        echo "distributionUrl=https\://services.gradle.org/distributions/gradle-8.7-bin.zip" >> gradle/wrapper/gradle-wrapper.properties
+        echo "zipStoreBase=GRADLE_USER_HOME" >> gradle/wrapper/gradle-wrapper.properties
+        echo "zipStorePath=wrapper/dists" >> gradle/wrapper/gradle-wrapper.properties
+
     - name: set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
 
-    - name: Grant execute permission for gradlew
+    - name: Grant execute permission
       run: chmod +x gradlew
 
-    # هنا قمنا بتغيير الأمر لإنتاج AAB بدلاً من APK
+    # بناء النسخة المخصصة للمتجر (AAB)
     - name: Build Bundle
       run: ./gradlew bundleRelease
 
-    # هنا قمنا بتغيير مسار الملف ليطابق مخرجات الـ AAB
+    # رفع النسخة
     - name: Upload AAB
       uses: actions/upload-artifact@v4
       with:
         name: my-app-bundle
         path: app/build/outputs/bundle/release/app-release.aab
+        
