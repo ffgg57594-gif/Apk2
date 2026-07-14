@@ -1,4 +1,4 @@
-apply plugin: 'com.drarabi.ppt'
+apply plugin: 'com.android.application'
 
 android {
     compileSdk 34
