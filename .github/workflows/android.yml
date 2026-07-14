@@ -2,23 +2,32 @@ name: Android CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "master" ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up JDK 17
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    # هنا قمنا بتغيير الأمر لإنتاج AAB بدلاً من APK
     - name: Build Bundle
       run: ./gradlew bundleRelease
-    - name: Upload Unsigned Bundle
+
+    # هنا قمنا بتغيير مسار الملف ليطابق مخرجات الـ AAB
+    - name: Upload AAB
       uses: actions/upload-artifact@v4
       with:
-        name: app-unsigned
+        name: my-app-bundle
         path: app/build/outputs/bundle/release/app-release.aab
-        
