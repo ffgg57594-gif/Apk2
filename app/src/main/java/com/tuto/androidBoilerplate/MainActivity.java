@@ -1,4 +1,3 @@
-// app/src/main/java/com/tuto/androidBoilerplate/MainActivity.java
 package com.tuto.androidBoilerplate;
 
 import android.app.Activity;
@@ -27,8 +26,16 @@ public class MainActivity extends Activity {
         // منع الروابط من الفتح في متصفح خارجي
         myWebView.setWebViewClient(new WebViewClient());
 
-        // تحميل ملف index.html من مجلد assets
-        myWebView.loadUrl("file:///android_asset/index.php");
+        // ---------------------------------------------------------
+        // التعديل هنا:
+        // لا يمكن تشغيل PHP محلياً من مجلد assets.
+        // يجب رفع السكربت على سيرفر خارجي واستدعاء الرابط كالتالي:
+        // ---------------------------------------------------------
+        myWebView.loadUrl("https://mohamed-arabi-powerpoint.rf.gd"); 
+        
+        // ملاحظة: إذا كان ملف الـ PHP لا يحتوي على أي أكواد PHP فعلية 
+        // وهو عبارة عن HTML فقط، فقم بتغيير امتداده إلى .html واستخدم السطر القديم:
+        // myWebView.loadUrl("file:///android_asset/index.html");
     }
 
     // التعامل مع زر الرجوع في الهاتف للرجوع داخل صفحات الويب
