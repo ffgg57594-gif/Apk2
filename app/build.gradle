@@ -22,7 +22,7 @@ android {
         }
     }
     
-    namespace 'com.tuto.androidBoilerplate'
+    namespace 'com.drarabi.ppt'
 
     // هذا الجزء هو الحل لمشكلة Duplicate class
     configurations.all {
