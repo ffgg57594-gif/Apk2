@@ -34,6 +34,17 @@ public class MainActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_CODE = 101;
     private long downloadId; // لتتبع عملية التحميل الحالية
 
+    // مستمع لانتهاء التحميل وإطلاق إشعار التطبيق الخاص
+    private final BroadcastReceiver onDownloadComplete = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+            if (downloadId == id) {
+                showAppNotification("اكتمل تحميل الملف", "تم حفظ ملف الباوربوينت بنجاح في مجلد التحميلات (Downloads).");
+            }
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -47,7 +58,7 @@ public class MainActivity extends Activity {
             requestNotificationPermission();
         }
 
-        // 3. تسجيل مستمع لانتهاء التحميل لإرسال إشعار التطبيق الخاص
+        // 3. تسجيل مستمع لانتهاء التحميل
         registerReceiver(onDownloadComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
 
         // تعريف الـ WebView وتجهيزه
@@ -87,7 +98,6 @@ public class MainActivity extends Activity {
                 request.allowScanningByMediaScanner();
                 
                 // إخفاء إشعار النظام الافتراضي حتى لا يتكرر الإشعار للمستخدم
-                // سنقوم نحن بإرسال الإشعار الخاص بالتطبيق عند اكتمال العملية
                 request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN);
                 
                 request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
@@ -120,17 +130,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    // --- استقبال حدث اكتمال التحميل وإطلاق إشعار التطبيق ---
-    private final BroadcastReceiver onDownloadComplete = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-            if (downloadId == id) {
-                showAppNotification("اكتمل تحميل الملف", "تم حفظ ملف الباوربوينت بنجاح في مجلد التحميلات (Downloads).");
-            }
-        }
-    };
-
     // --- دالة إظهار إشعار مخصص يحمل اسم وأيقونة التطبيق ---
     private void showAppNotification(String title, String message) {
         NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -145,7 +144,6 @@ public class MainActivity extends Activity {
 
         builder.setContentTitle(title)
                .setContentText(message)
-               // سيتم استخدام أيقونة التحميل المكتمل، أو يمكنك وضع أيقونة تطبيقك الخاصة R.mipmap.ic_launcher
                .setSmallIcon(android.R.drawable.stat_sys_download_done) 
                .setAutoCancel(true)
                .setPriority(Notification.PRIORITY_HIGH);
@@ -189,3 +187,4 @@ public class MainActivity extends Activity {
             super.onBackPressed();
         }
     }
+}
