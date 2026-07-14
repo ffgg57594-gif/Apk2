@@ -15,6 +15,11 @@ import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
 import android.widget.Toast;
 
+// --- المكتبات الجديدة لطلب إذن الإشعارات ---
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
+
 public class MainActivity extends Activity {
 
     private WebView myWebView;
@@ -23,6 +28,15 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // ---------------------------------------------------------
+        // طلب إذن الإشعارات تلقائياً لأجهزة أندرويد 13 فما فوق (API 33+)
+        // ---------------------------------------------------------
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
+            }
+        }
 
         // تعريف الـ WebView وتجهيزه
         myWebView = (WebView) findViewById(R.id.webview);
@@ -85,4 +99,4 @@ public class MainActivity extends Activity {
             super.onBackPressed();
         }
     }
-}
+            }
