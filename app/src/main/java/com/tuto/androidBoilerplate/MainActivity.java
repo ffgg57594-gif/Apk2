@@ -28,7 +28,7 @@ public class MainActivity extends Activity {
         myWebView.setWebViewClient(new WebViewClient());
 
         // تحميل ملف index.html من مجلد assets
-        myWebView.loadUrl("file:///android_asset/index.html");
+        myWebView.loadUrl("file:///android_asset/index.php");
     }
 
     // التعامل مع زر الرجوع في الهاتف للرجوع داخل صفحات الويب
