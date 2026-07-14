@@ -34,15 +34,17 @@ public class MainActivity extends Activity {
     private static final int NOTIFICATION_PERMISSION_CODE = 101;
     private long downloadId = -1; // لتتبع عملية التحميل الحالية
     private boolean isReceiverRegistered = false; // لمنع الكراش عند إلغاء التسجيل
+    private String lastDownloadedFileName = "presentation.pptx"; // لتخزين اسم الملف الأخير
 
-    // مستمع لانتهاء التحميل وإطلاق إشعار التطبيق الخاص
+    // مستمع لانتهاء التحميل وإطلاق إشعار التطبيق الخاص بالتفاصيل والصورة
     private final BroadcastReceiver onDownloadComplete = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             try {
                 long id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
                 if (downloadId != -1 && downloadId == id) {
-                    showAppNotification("اكتمل تحميل الملف", "تم حفظ ملف الباوربوينت بنجاح في مجلد التحميلات (Downloads).");
+                    // إطلاق إشعار التطبيق المخصص عند اكتمال التحميل بنجاح
+                    showAppNotification("اكتمل تحميل الملف بنجاح", "تم حفظ الملف باسم: " + lastDownloadedFileName);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -78,7 +80,6 @@ public class MainActivity extends Activity {
                 isReceiverRegistered = true;
             } catch (Exception e) {
                 e.printStackTrace();
-                // حماية احتياطية في حال فشل التسجيل بالطريقة الجديدة
                 try {
                     registerReceiver(onDownloadComplete, new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE));
                     isReceiverRegistered = true;
@@ -117,22 +118,26 @@ public class MainActivity extends Activity {
                                 request.addRequestHeader("cookie", cookies);
                             }
                             request.addRequestHeader("User-Agent", userAgent);
-                            request.setDescription("جاري تحميل ملف الباوربوينت...");
                             
-                            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
-                            request.setTitle(fileName);
+                            // تخمين وحفظ اسم الملف لعرضه لاحقاً في إشعار التطبيق المخصص
+                            lastDownloadedFileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                            
+                            request.setDescription("جاري تحميل ملف الباوربوينت الخاص بك...");
+                            request.setTitle(lastDownloadedFileName);
                             request.allowScanningByMediaScanner();
                             
-                            // إخفاء إشعار النظام الافتراضي حتى لا يتكرر الإشعار للمستخدم
-                            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN);
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+                            // تعديل هام جداً: إظهار شريط تقدم التحميل الفعلي للمستخدم في الإشعارات أثناء التحميل
+                            // وسيختفي إشعار النظام تلقائياً بمجرد الاكتمال ليحل محله إشعار تطبيقك المخصص
+                            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE);
+                            
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, lastDownloadedFileName);
                             
                             DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
                             if (dm != null) {
                                 downloadId = dm.enqueue(request); // حفظ رقم التحميل لتتبعه
                             }
                             
-                            Toast.makeText(getApplicationContext(), "بدأ تحميل ملف الباوربوينت...", Toast.LENGTH_LONG).show();
+                            Toast.makeText(getApplicationContext(), "بدأ تحميل: " + lastDownloadedFileName, Toast.LENGTH_LONG).show();
                         } catch (Exception e) {
                             Toast.makeText(getApplicationContext(), "حدث خطأ أثناء بدء التحميل: " + e.getMessage(), Toast.LENGTH_LONG).show();
                             e.printStackTrace();
@@ -164,7 +169,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    // --- دالة إظهار إشعار مخصص يحمل اسم وأيقونة التطبيق ---
+    // --- دالة إظهار إشعار مخصص يحمل اسم وصورة (أيقونة) التطبيق بالكامل ---
     private void showAppNotification(String title, String message) {
         try {
             NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -177,9 +182,11 @@ public class MainActivity extends Activity {
                 builder = new Notification.Builder(this);
             }
 
+            // هنا يتم إعداد إشعار التطبيق المخصص بشكل كامل:
+            // تم تغيير الأيقونة لتكون أيقونة تطبيقك الأساسية R.mipmap.ic_launcher لتبان بوضوح مع الاسم
             builder.setContentTitle(title)
                    .setContentText(message)
-                   .setSmallIcon(android.R.drawable.stat_sys_download_done) 
+                   .setSmallIcon(R.mipmap.ic_launcher) // أيقونة تطبيقك الرسمية
                    .setAutoCancel(true);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
@@ -196,8 +203,8 @@ public class MainActivity extends Activity {
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                CharSequence name = "إشعارات التطبيق";
-                String description = "قناة مخصصة لإشعارات تحميل الملفات داخل التطبيق";
+                CharSequence name = "إشعارات التحميل ميكر";
+                String description = "عرض حالة تقدم واكتمال تنزيلات ملفات الباوربوينت الخاصة بك";
                 int importance = NotificationManager.IMPORTANCE_HIGH;
                 NotificationChannel channel = new NotificationChannel(CHANNEL_ID, name, importance);
                 channel.setDescription(description);
@@ -235,4 +242,4 @@ public class MainActivity extends Activity {
             super.onBackPressed();
         }
     }
-                    }
+                                             }
