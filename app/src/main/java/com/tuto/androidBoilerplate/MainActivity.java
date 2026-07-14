@@ -1,4 +1,4 @@
-package com.tuto.androidBoilerplate;
+package com.drarabi.ppt;
 
 import android.app.Activity;
 import android.os.Bundle;
