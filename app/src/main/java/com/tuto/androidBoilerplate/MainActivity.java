@@ -15,17 +15,13 @@ import android.webkit.DownloadListener;
 import android.webkit.URLUtil;
 import android.widget.Toast;
 
-// --- مكتبات الإشعارات والبطارية وصلاحياتها ---
+// --- مكتبات الإشعارات وصلاحياتها ---
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Notification;
-import android.os.PowerManager;
-import android.content.Intent;
-import android.provider.Settings;
-import android.content.Context;
 
 public class MainActivity extends Activity {
 
@@ -33,9 +29,6 @@ public class MainActivity extends Activity {
     private static final String CHANNEL_ID = "app_download_channel";
     private static final int NOTIFICATION_PERMISSION_CODE = 101;
     private boolean isNotificationSent = false;
-
-    // قفل المعالج لمنع إغلاق التطبيق في الخلفية
-    private PowerManager.WakeLock wakeLock;
 
     // --- جسر التواصل الذكي ---
     public class WebAppInterface {
@@ -58,119 +51,81 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        try {
-            setContentView(R.layout.activity_main);
+        // 1. ربط الواجهة أولاً لضمان عدم ظهور شاشة بيضاء
+        setContentView(R.layout.activity_main);
 
-            // 1. تفعيل WakeLock لإبقاء التطبيق يعمل في الخلفية بدون أن ينام
-            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (powerManager != null) {
-                wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyApp::BackgroundWork");
-                wakeLock.acquire(); // تشغيل القفل
-            }
+        // 2. إنشاء قناة الإشعارات
+        createNotificationChannel();
 
-            // 2. طلب استثناء التطبيق من قيود البطارية (مهم جداً لمنع قطع الإنترنت)
-            requestBatteryOptimizationExemption();
-
-            createNotificationChannel();
-
-            if (!hasNotificationPermission()) {
-                requestNotificationPermission();
-            }
-
-            myWebView = (WebView) findViewById(R.id.webview);
-            if (myWebView != null) {
-                WebSettings webSettings = myWebView.getSettings();
-                webSettings.setJavaScriptEnabled(true); 
-                webSettings.setDomStorageEnabled(true); 
-                webSettings.setAllowFileAccess(true);
-                
-                // منع التطبيق من إيقاف السكربتات في الخلفية
-                myWebView.resumeTimers();
-
-                myWebView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
-
-                myWebView.setWebViewClient(new WebViewClient() {
-                    @Override
-                    public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                        super.onPageStarted(view, url, favicon);
-                        isNotificationSent = false;
-                    }
-
-                    @Override
-                    public void onPageFinished(WebView view, String url) {
-                        super.onPageFinished(view, url);
-                        injectNotificationScript();
-                    }
-                });
-
-                myWebView.setDownloadListener(new DownloadListener() {
-                    @Override
-                    public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
-                        try {
-                            if (!hasNotificationPermission()) {
-                                requestNotificationPermission();
-                            }
-
-                            DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
-                            request.setMimeType(mimeType);
-                            
-                            String cookies = CookieManager.getInstance().getCookie(url);
-                            if (cookies != null) {
-                                request.addRequestHeader("cookie", cookies);
-                            }
-                            request.addRequestHeader("User-Agent", userAgent);
-                            
-                            String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
-                            request.setDescription("جاري تنزيل ملف الباوربوينت الخاص بك...");
-                            request.setTitle(fileName);
-                            request.allowScanningByMediaScanner();
-                            
-                            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
-                            
-                            DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
-                            if (dm != null) {
-                                dm.enqueue(request); 
-                            }
-                        } catch (Exception e) {
-                            Toast.makeText(getApplicationContext(), "حدث خطأ أثناء بدء التحميل: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                            e.printStackTrace();
-                        }
-                    }
-                });
-
-                myWebView.loadUrl("https://mohamed-arabi-powerpoint.rf.gd/"); 
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+        // 3. طلب إذن الإشعارات
+        if (!hasNotificationPermission()) {
+            requestNotificationPermission();
         }
-    }
 
-    // --- دالة طلب إيقاف تحسين البطارية للتطبيق (لمنع قطع الإنترنت) ---
-    private void requestBatteryOptimizationExemption() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Intent intent = new Intent();
-            String packageName = getPackageName();
-            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (pm != null && !pm.isIgnoringBatteryOptimizations(packageName)) {
-                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                intent.setData(Uri.parse("package:" + packageName));
-                try {
-                    startActivity(intent);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    // --- إجبار المتصفح على عدم النوم عند الخروج من التطبيق ---
-    @Override
-    protected void onPause() {
-        super.onPause();
-        // لن نقوم باستدعاء myWebView.onPause() لكي لا يتوقف عمل الـ AI
+        // 4. تجهيز الـ WebView بشكل آمن
+        myWebView = (WebView) findViewById(R.id.webview);
+        
         if (myWebView != null) {
-            myWebView.resumeTimers();
+            WebSettings webSettings = myWebView.getSettings();
+            webSettings.setJavaScriptEnabled(true); 
+            webSettings.setDomStorageEnabled(true); 
+            webSettings.setAllowFileAccess(true);
+
+            // ربط الجسر البرمجي مع صفحة الويب
+            myWebView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
+
+            myWebView.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                    super.onPageStarted(view, url, favicon);
+                    isNotificationSent = false;
+                }
+
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    super.onPageFinished(view, url);
+                    injectNotificationScript();
+                }
+            });
+
+            myWebView.setDownloadListener(new DownloadListener() {
+                @Override
+                public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
+                    try {
+                        if (!hasNotificationPermission()) {
+                            requestNotificationPermission();
+                        }
+
+                        DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
+                        request.setMimeType(mimeType);
+                        
+                        String cookies = CookieManager.getInstance().getCookie(url);
+                        if (cookies != null) {
+                            request.addRequestHeader("cookie", cookies);
+                        }
+                        request.addRequestHeader("User-Agent", userAgent);
+                        
+                        String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
+                        request.setDescription("جاري تنزيل ملف الباوربوينت الخاص بك...");
+                        request.setTitle(fileName);
+                        request.allowScanningByMediaScanner();
+                        
+                        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+                        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+                        
+                        DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
+                        if (dm != null) {
+                            dm.enqueue(request); 
+                        }
+                    } catch (Exception e) {
+                        Toast.makeText(getApplicationContext(), "حدث خطأ أثناء بدء التحميل: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        e.printStackTrace();
+                    }
+                }
+            });
+
+            // 5. تحميل رابط موقعك في النهاية لضمان عمل كل شيء
+            myWebView.loadUrl("https://mohamed-arabi-powerpoint.rf.gd/"); 
         }
     }
 
@@ -267,15 +222,6 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        // تحرير قفل المعالج عند إغلاق التطبيق تماماً للحفاظ على البطارية
-        if (wakeLock != null && wakeLock.isHeld()) {
-            wakeLock.release();
-        }
-    }
-
-    @Override
     public void onBackPressed() {
         if (myWebView != null && myWebView.canGoBack()) {
             myWebView.goBack();
@@ -283,4 +229,4 @@ public class MainActivity extends Activity {
             super.onBackPressed();
         }
     }
-                }
+                            }
