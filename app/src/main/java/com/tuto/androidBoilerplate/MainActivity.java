@@ -28,6 +28,25 @@ public class MainActivity extends Activity {
     private WebView myWebView;
     private static final String CHANNEL_ID = "app_download_channel";
     private static final int NOTIFICATION_PERMISSION_CODE = 101;
+    private boolean isNotificationSent = false; // لمنع تكرار الإشعار لنفس الملف
+
+    // --- جسر التواصل الذكي بين صفحة الويب وكود الأندرويد ---
+    public class WebAppInterface {
+        @android.webkit.JavascriptInterface
+        public void onFileReady() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    // إطلاق الإشعار فوراً بمجرد ظهور زر التحميل على الشاشة
+                    if (!isNotificationSent) {
+                        isNotificationSent = true;
+                        showAppNotification("عرضك التقديمي جاهز! 🚀", "انتهى الذكاء الاصطناعي من إعداد ملفك. يمكنك الضغط لتحميله الآن.");
+                        Toast.makeText(getApplicationContext(), "ملفك جاهز للتحميل الآن!", Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,21 +67,35 @@ public class MainActivity extends Activity {
             myWebView = (WebView) findViewById(R.id.webview);
             if (myWebView != null) {
                 WebSettings webSettings = myWebView.getSettings();
-                webSettings.setJavaScriptEnabled(true); 
+                webSettings.setJavaScriptEnabled(true); // تفعيل الجافا سكريبت (مهم جداً لعمل المراقب)
                 webSettings.setDomStorageEnabled(true); 
                 webSettings.setAllowFileAccess(true);
 
-                // منع الروابط من الفتح في متصفح خارجي
-                myWebView.setWebViewClient(new WebViewClient());
+                // ربط الجسر البرمجي مع صفحة الويب
+                myWebView.addJavascriptInterface(new WebAppInterface(), "AndroidInterface");
 
-                // --- كود تفعيل التحميل ---
+                // مراقبة الويب وحقن كود الفحص التلقائي لزر التحميل
+                myWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                        super.onPageStarted(view, url, favicon);
+                        // إعادة تصفير حالة الإشعار عند الانتقال لصفحة جديدة أو تحديثها
+                        isNotificationSent = false;
+                    }
+
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        super.onPageFinished(view, url);
+                        // حقن كود المراقبة الذكي بمجرد اكتمال تحميل الصفحة
+                        injectNotificationScript();
+                    }
+                });
+
+                // --- كود تفعيل التحميل الافتراضي ---
                 myWebView.setDownloadListener(new DownloadListener() {
                     @Override
                     public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
                         try {
-                            // هذه الدالة (onDownloadStart) لن يتم استدعاؤها إلا بعد مرور (2-3 دقائق) 
-                            // عندما ينتهي الذكاء الاصطناعي من تجهيز الملف ويرسله للتحميل.
-
                             if (!hasNotificationPermission()) {
                                 requestNotificationPermission();
                             }
@@ -77,24 +110,19 @@ public class MainActivity extends Activity {
                             request.addRequestHeader("User-Agent", userAgent);
                             
                             String fileName = URLUtil.guessFileName(url, contentDisposition, mimeType);
-                            request.setDescription("جاري تنزيل الملف الخاص بك...");
+                            request.setDescription("جاري تنزيل ملف الباوربوينت الخاص بك...");
                             request.setTitle(fileName);
                             request.allowScanningByMediaScanner();
                             
-                            // إبقاء إشعار النظام الافتراضي (شريط التحميل والاكتمال) كما هو
+                            // إبقاء إشعار نظام التحميل الافتراضي (التقدم والتنزيلات) كما هو دون تغيير
                             request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
                             
                             request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
                             
                             DownloadManager dm = (DownloadManager) getSystemService(DOWNLOAD_SERVICE);
                             if (dm != null) {
-                                dm.enqueue(request); // بدء التحميل الفعلي
+                                dm.enqueue(request); // بدء التنزيل الفعلي بعد ضغط المستخدم
                             }
-                            
-                            // إرسال إشعار تطبيقك المخصص "الآن فقط" ليخبره أن التجهيز انتهى وبدأ التحميل
-                            showAppNotification("عرضك التقديمي جاهز! 🚀", "انتهى الذكاء الاصطناعي وبدأ تحميل الملف: " + fileName);
-                            
-                            Toast.makeText(getApplicationContext(), "الملف جاهز! بدأ التحميل...", Toast.LENGTH_LONG).show();
                         } catch (Exception e) {
                             Toast.makeText(getApplicationContext(), "حدث خطأ أثناء بدء التحميل: " + e.getMessage(), Toast.LENGTH_LONG).show();
                             e.printStackTrace();
@@ -108,6 +136,44 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "حدث خطأ أثناء تشغيل التطبيق", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    // --- دالة حقن كود جافا سكريبت لمراقبة الصفحة بشكل ديناميكي فوري ---
+    private void injectNotificationScript() {
+        if (myWebView == null) return;
+        
+        // كود ذكي يبحث في الصفحة عن أي أزرار أو روابط تحتوي على كلمات "تحميل" أو "Download" أو "جاهز"
+        // ويستخدم تقنية MutationObserver لملاحظة أي تغيير يحدث في الصفحة فوراً عند اكتمال المعالجة
+        String js = "javascript:(function() {" +
+                "function checkReady() {" +
+                "    var elements = document.querySelectorAll('a, button, div, span, p');" +
+                "    for (var i = 0; i < elements.length; i++) {" +
+                "        var text = elements[i].innerText || elements[i].textContent;" +
+                "        if ((text.includes('تحميل') || text.toLowerCase().includes('download') || text.includes('جاهز')) " +
+                "            && (elements[i].tagName === 'A' || elements[i].tagName === 'BUTTON' || elements[i].classList.contains('btn') || elements[i].id.includes('download') || elements[i].className.includes('download'))) {" +
+                "            if (elements[i].offsetWidth > 0 && elements[i].offsetHeight > 0) {" +
+                "                AndroidInterface.onFileReady();" +
+                "                return true;" +
+                "            }" +
+                "        }" +
+                "    }" +
+                "    return false;" +
+                "}" +
+                "if (!checkReady()) {" +
+                "    var observer = new MutationObserver(function(mutations) {" +
+                "        if (checkReady()) {" +
+                "            observer.disconnect();" +
+                "        }" +
+                "    });" +
+                "    observer.observe(document.body, { childList: true, subtree: true });" +
+                "}" +
+                "})()";
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            myWebView.evaluateJavascript(js, null);
+        } else {
+            myWebView.loadUrl(js);
         }
     }
 
@@ -126,7 +192,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    // --- دالة إظهار إشعار مخصص فوري يحمل اسم وصورة تطبيقك ---
+    // --- دالة إظهار إشعار مخصص فوري يحمل اسم وصورة تطبيقك المخصص ---
     private void showAppNotification(String title, String message) {
         try {
             NotificationManager notificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
@@ -141,7 +207,7 @@ public class MainActivity extends Activity {
 
             builder.setContentTitle(title)
                    .setContentText(message)
-                   .setSmallIcon(R.mipmap.ic_launcher) // أيقونة تطبيقك
+                   .setSmallIcon(R.mipmap.ic_launcher) // أيقونة وصورة تطبيقك المخصصة
                    .setAutoCancel(true);
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
