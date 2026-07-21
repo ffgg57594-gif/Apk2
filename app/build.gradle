@@ -1,16 +1,16 @@
 apply plugin: 'com.android.application'
 
 android {
-    compileSdk 35
+    compileSdk 36
     
     defaultConfig {
         applicationId "com.drarabi.ppt"
         minSdkVersion 21
-        targetSdkVersion 35
+        targetSdkVersion 36
         
         // --- التغيير الأهم: يجب زيادة هذا الرقم في كل تحديث ---
-        versionCode 4 
-        versionName "1.2.1" 
+        versionCode 5 
+        versionName "1.2.2" 
         // ----------------------------------------------------
     }
 
